@@ -11,7 +11,9 @@ void myfunc1(void)
 
 int myfunc1_lwrapper(lua_State* ls)
 {
+	lua_pushnil(ls); //FIXME
 	myfunc1();
+	return 0;
 }
 
 int str2int(const char* str)
