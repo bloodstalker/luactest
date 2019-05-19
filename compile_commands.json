@@ -1,7 +1,0 @@
-[
-    {
-        "command": "cc -c -fpic -o main.o main.c", 
-        "directory": "/home/bloodstalker/devi/luactest", 
-        "file": "/home/bloodstalker/devi/luactest/main.c"
-    }
-]

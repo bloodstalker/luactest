@@ -6,8 +6,9 @@ CC?=clang
 CC_FLAGS=-fpic
 CC_EXTRA?=
 CTAGS_I_PATH?=./
-LD_FLAGS=
+LD_FLAGS= -lm -ldl -L ./lua/src/
 EXTRA_LD_FLAGS?=
+LIB_LUA=./lua/src/liblua.a
 ADD_SANITIZERS_CC= -g -fsanitize=address -fno-omit-frame-pointer
 ADD_SANITIZERS_LD= -g -fsanitize=address
 MEM_SANITIZERS_CC= -g -fsanitize=memory -fno-omit-frame-pointer
@@ -81,6 +82,9 @@ depend:.depend
 
 -include ./.depend
 
+$(LIB_LUA):
+	$(MAKE) -C lua/src linux
+
 .c.o:
 	$(CC) $(CC_FLAGS) -c $< -o $@
 
@@ -90,16 +94,16 @@ depend:.depend
 %.ocov:%.c
 	$(CC) $(CC_FLAGS) $(COV_CC) -c $< -o $@
 
-$(TARGET): $(TARGET).o
-	$(CC) $(LD_FLAGS) $^ -o $@
+$(TARGET): $(TARGET).o test.o $(LIB_LUA)
+	$(CC) $^ $(LD_FLAGS) -o $@
 
-$(TARGET)-static: $(TARGET).o
+$(TARGET)-static: $(TARGET).o $(LIB_LUA)
 	$(CC) $(LD_FLAGS) $^ -static -o $@
 
-$(TARGET)-dbg: $(TARGET).odbg
+$(TARGET)-dbg: $(TARGET).odbg $(LIB_LUA)
 	$(CC) $(LD_FLAGS) $^ -g -o $@
 
-$(TARGET)-cov: $(TARGET).ocov
+$(TARGET)-cov: $(TARGET).ocov $(LIB_LUA)
 	$(CC) $(LD_FLAGS) $^ $(COV_LD) -o $@
 
 cov: runcov
@@ -145,10 +149,10 @@ tags:$(SRCS)
 %.js: %.c
 	emcc $< -o $@
 
-$(TARGET).so: $(TARGET).o
+$(TARGET).so: $(TARGET).o $(LIB_LUA)
 	$(CC) $(LD_FLAGS) $^ -shared -o $@
 
-$(TARGET).a: $(TARGET).o
+$(TARGET).a: $(TARGET).o $(LIB_LUA)
 	ar rcs $(TARGET).a $(TARGET).o
 
 runcov: $(TARGET)-cov
@@ -176,6 +180,7 @@ deepclean: clean
 	- rm vgcore.*
 	- rm compile_commands.json
 	- rm *.gch
+	$(MAKE) -C lua clean
 
 help:
 	@echo "--all is the default target, runs $(TARGET) target"
