@@ -4,3 +4,6 @@
 [submodule "libtool/cfe-extra"]
 	path = libtool/cfe-extra
 	url = https://github.com/bloodstalker/cfe-extra
+[submodule "luatablegen"]
+	path = luatablegen
+	url = https://github.com/bloodstalker/luatablegen
