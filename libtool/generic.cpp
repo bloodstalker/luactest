@@ -108,7 +108,11 @@ class FuncDecl : public MatchFinder::MatchCallback
 public:
   FuncDecl (Rewriter &Rewrite) : Rewrite (Rewrite) {}
 
-  virtual void run(const MatchFinder::MatchResult &MR) {}
+  virtual void run(const MatchFinder::MatchResult &MR) {
+    const FunctionDecl* FD = MR.Nodes.getNodeAs<clang::FunctionDecl>("funcdecl");
+    const ArrayRef<ParmVarDecl*> PVD = FD->parameters();
+    const QualType RT = FD->getReturnType();
+  }
 
 private:
   Rewriter &Rewrite;

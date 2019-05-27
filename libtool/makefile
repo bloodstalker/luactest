@@ -148,6 +148,7 @@ clean:
 deepclean: clean
 	rm tags
 	rm .depend
+	$(MAKE) -C ./cfe-extra clean
 
 help:
 	@echo "--all is the default target, runs $(TARGET) target"

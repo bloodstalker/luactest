@@ -18,7 +18,7 @@ flags = [
     # a "-std=<something>".
     # For a C project, you would set this to something like 'c99' instead of
     # 'c++11'.
-    '-std=c99',
+    '-std=c++17',
     # ...and the same thing goes for the magic -x option which specifies the
     # language that the files to be compiled are written in. This is mostly
     # relevant for c++ headers.
@@ -29,6 +29,8 @@ flags = [
     '-isystem', '/usr/local/include',
     '-I', 'include',
     '-I.',
+    '-I$(llvm-config --src-root)/tools/clang/include'
+    '-I$(llvm-config --obj-root)/tools/clang/include'
 ]
 
 # Set this to the absolute path to the folder (NOT the file!) containing the
