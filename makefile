@@ -85,6 +85,15 @@ depend:.depend
 $(LIB_LUA):
 	$(MAKE) -C lua/src linux
 
+linenoise.o: ./linenoise/linenoise.c
+	$(CC) $(CC_FLAGS) linenoise/linenoise.c -c -o linenoise.o
+
+linenoise.odbg: ./linenoise/linenoise.c
+	$(CC) $(CC_FLAGS) linenoise/linenoise.c -g -c -o linenoise.odbg
+
+linenoise.ocov: ./linenoise/linenoise.c
+	$(CC) $(CC_FLAGS) $(COV_CXX) linenoise/linenoise.c -c -o linenoise.ocov
+
 .c.o:
 	$(CC) $(CC_FLAGS) -c $< -o $@
 
@@ -94,16 +103,16 @@ $(LIB_LUA):
 %.ocov:%.c
 	$(CC) $(CC_FLAGS) $(COV_CC) -c $< -o $@
 
-$(TARGET): $(TARGET).o test.o $(LIB_LUA)
+$(TARGET): $(TARGET).o test.o $(LIB_LUA) linenoise.o
 	$(CC) $^ $(LD_FLAGS) -o $@
 
-$(TARGET)-static: $(TARGET).o $(LIB_LUA)
+$(TARGET)-static: $(TARGET).o $(LIB_LUA) linenoise.o
 	$(CC) $(LD_FLAGS) $^ -static -o $@
 
-$(TARGET)-dbg: $(TARGET).odbg $(LIB_LUA)
+$(TARGET)-dbg: $(TARGET).odbg $(LIB_LUA) linenoise.odbg
 	$(CC) $(LD_FLAGS) $^ -g -o $@
 
-$(TARGET)-cov: $(TARGET).ocov $(LIB_LUA)
+$(TARGET)-cov: $(TARGET).ocov $(LIB_LUA) linenoise.ocov
 	$(CC) $(LD_FLAGS) $^ $(COV_LD) -o $@
 
 cov: runcov
@@ -149,10 +158,10 @@ tags:$(SRCS)
 %.js: %.c
 	emcc $< -o $@
 
-$(TARGET).so: $(TARGET).o $(LIB_LUA)
+$(TARGET).so: $(TARGET).o $(LIB_LUA) linenoise.o
 	$(CC) $(LD_FLAGS) $^ -shared -o $@
 
-$(TARGET).a: $(TARGET).o $(LIB_LUA)
+$(TARGET).a: $(TARGET).o $(LIB_LUA) linenoise.o
 	ar rcs $(TARGET).a $(TARGET).o
 
 runcov: $(TARGET)-cov

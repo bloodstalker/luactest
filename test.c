@@ -4,18 +4,6 @@
 #include "./lua/src/lua.h"
 #include "./lua/src/lualib.h"
 
-void myfunc1(void)
-{
-	printf("die die die\n");
-}
-
-int myfunc1_lwrapper(lua_State* ls)
-{
-	lua_pushnil(ls); //FIXME
-	myfunc1();
-	return 0;
-}
-
 int str2int(const char* str)
 {
 	int res = 0;
@@ -59,7 +47,7 @@ int str2int(const char* str)
 	return res;
 }
 
-int str2int_l(lua_State *ls)
+int str2int_lct(lua_State *ls)
 {
 	const char* str = lua_tostring(ls, 1);
 	int res = str2int(str);
