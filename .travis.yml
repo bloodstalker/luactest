@@ -11,10 +11,9 @@ matrix:
     addons:
       coverity_scan:
         project:
-          name: "bloodstalker/mutator"
+          name: "bloodstalker/luactest"
           description: "Build submitted via Travis CI"
         notification_email: thabogre@gmail.com
-        build_command_prepend: "cov-configure --comptype clangcxx --compiler clang-5.0"
         build_command:   "make CC=gcc"
         branch_pattern: master
 
