@@ -1,5 +1,10 @@
 
+[![Build Status](https://travis-ci.org/bloodstalker/luactest.svg?branch=master)](https://travis-ci.org/bloodstalker/luactest)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/bloodstalker/luactest.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/bloodstalker/luactest/alerts/)
+<a href="https://scan.coverity.com/projects/bloodstalker-luactest">
+  <img alt="Coverity Scan Build Status"
+       src="https://img.shields.io/coverity/scan/18518.svg"/>
+</a>
 
 
 # luactest
