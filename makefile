@@ -109,10 +109,10 @@ $(TARGET): $(TARGET).o test.o $(LIB_LUA) linenoise.o
 $(TARGET)-static: $(TARGET).o $(LIB_LUA) linenoise.o
 	$(CC) $(LD_FLAGS) $^ -static -o $@
 
-$(TARGET)-dbg: $(TARGET).odbg $(LIB_LUA) linenoise.odbg
+$(TARGET)-dbg: $(TARGET).odbg test.odbg $(LIB_LUA) linenoise.odbg
 	$(CC) $(LD_FLAGS) $^ -g -o $@
 
-$(TARGET)-cov: $(TARGET).ocov $(LIB_LUA) linenoise.ocov
+$(TARGET)-cov: $(TARGET).ocov test.ocov $(LIB_LUA) linenoise.ocov
 	$(CC) $(LD_FLAGS) $^ $(COV_LD) -o $@
 
 cov: runcov
