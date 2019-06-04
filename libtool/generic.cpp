@@ -63,9 +63,10 @@ using namespace clang::tooling;
 /**********************************************************************************************************************/
 namespace {
   static llvm::cl::OptionCategory ctbcat("Obfuscator custom options");
-  cl::opt<bool> CheckSystemHeader("SysHeader", cl::desc("mutator-lvl0 will run through System Headers"), cl::init(false), cl::cat(ctbcat), cl::ZeroOrMore);
-  cl::opt<bool> MainFileOnly("MainOnly", cl::desc("mutator-lvl0 will only report the results that reside in the main file"), cl::init(false), cl::cat(ctbcat), cl::ZeroOrMore);
+  cl::opt<bool> CheckSystemHeader("SysHeader", cl::desc("match results in sys header also"), cl::init(false), cl::cat(ctbcat), cl::ZeroOrMore);
+  cl::opt<bool> MainFileOnly("MainOnly", cl::desc("only matches in the main file"), cl::init(true), cl::cat(ctbcat), cl::ZeroOrMore);
   std::string TEMP_FILE="/tmp/generic_temp";
+  cl::opt<std::string> AutoGenOut("autogen", cl::desc("the complete path to the output file that will hold the Lua wrappers for your functions"), cl::init("./dummy.c"), cl::cat(ctbcat), cl::ZeroOrMore);
 }
 /**********************************************************************************************************************/
 SourceLocation SourceLocationHasMacro(SourceLocation sl, Rewriter &rewrite) {
@@ -79,6 +80,46 @@ SourceLocation SourceLocationHasMacro(SourceLocation sl, Rewriter &rewrite) {
 SourceLocation getSLSpellingLoc(SourceLocation sl, Rewriter &rewrite) {
   if (sl.isMacroID()) return rewrite.getSourceMgr().getSpellingLoc(sl);
   else return sl;
+}
+
+std::string GetLuaRetPushExpr(const clang::Type* TP) {
+  if (TP->isIntegerType()) {
+    return "lua_pushinteger";
+  } // integer
+  if (TP->isFloatingType()) {
+    return "lua_pushnumber";
+  } // float/number
+  if (TP->isRecordType()) {} // struct or union
+  if (TP->isPointerType()) {} // pointer
+  if (TP->isVoidType()) {} // do nothing
+  if (TP->isBooleanType()) {} // boolean
+  if (TP->isCharType()) {
+    return "lua_pushstring";
+  } // string
+  if (TP->isEnumeralType()) {} // enumeration
+  return "";
+}
+
+std::string GetLuaParamPushExpr(const clang::Type* TP) {
+  if (TP->isIntegerType()) {
+    return "lua_tointeger";
+  } // integer
+  if (TP->isFloatingType()) {
+    return "lua_tonumber";
+  } // float/number
+  if (TP->isRecordType()) {} // struct or union
+  if (TP->isPointerType()) {
+    return "lua_touserdata";
+  } // pointer
+  if (TP->isVoidType()) {} // do nothing
+  if (TP->isBooleanType()) {
+    return "lua_toboolean";
+  } // boolean
+  if (TP->isCharType()) {
+    return "lua_tostring";
+  } // string
+  if (TP->isEnumeralType()) {} // enumeration
+  return "";
 }
 /**********************************************************************************************************************/
 class CalledFunc : public MatchFinder::MatchCallback {
@@ -110,8 +151,36 @@ public:
 
   virtual void run(const MatchFinder::MatchResult &MR) {
     const FunctionDecl* FD = MR.Nodes.getNodeAs<clang::FunctionDecl>("funcdecl");
+    SourceLocation SL = FD->getSourceRange().getBegin();
+    if (Devi::IsTheMatchInSysHeader(CheckSystemHeader, MR, SL)) return void();
+    if (!Devi::IsTheMatchInMainFile(MainFileOnly, MR, SL)) return void();
+    
     const ArrayRef<ParmVarDecl*> PVD = FD->parameters();
     const QualType RT = FD->getReturnType();
+    const clang::Type* TPR = RT.getTypePtr();
+    const FunctionDecl* FDef = FD->getDefinition();
+    std::string FuncName = FD->getNameAsString();
+    std::ofstream fs;
+    fs.open(AutoGenOut, std::ios_base::app);
+
+    fs << "function name: " << FuncName << "\t";
+    fs << "return type: " <<   RT.getAsString() << "\t";
+
+    fs << "int " << FuncName << "_lct(lua_State* ls);"  << "\n";
+    fs << "int " << FuncName << "_lct(lua_State* ls) {"  << "\n";
+    if (FDef) {
+      for (auto &iter : PVD) {
+        QualType QT = iter->getType();
+        const clang::Type* TPP = QT.getTypePtr();
+        fs << "param: " << QT.getAsString() << " ";
+        fs << iter->getNameAsString() << "\t";
+        const NamedDecl* ND = iter->getUnderlyingDecl();
+      }
+    }
+    fs << "return 0;\n";
+    fs << "}\n";
+    fs << "\n";
+    fs.close();
   }
 
 private:
@@ -309,6 +378,8 @@ private:
 /**********************************************************************************************************************/
 /*Main*/
 int main(int argc, const char **argv) {
+  std::fstream fs;
+  //fs.open(AutoGenOut);
   CommonOptionsParser op(argc, argv, ctbcat);
   const std::vector<std::string> &SourcePathList = op.getSourcePathList();
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());

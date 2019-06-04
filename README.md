@@ -17,6 +17,7 @@ you can run the makefile in the root directory. then run the executable, type in
 ## TODO
 * write the libtooling tool.<br/>
 * need to add completion and hints for `linenoise`.<br/>
+* add non-interactive execution to tool.<br/>
 * add cygwin support because i have to use windows at work...<br/>
 
 
@@ -24,7 +25,8 @@ you can run the makefile in the root directory. then run the executable, type in
 The `luarocks` feature work for Lua 5.3. I haven't looked at the Lua 5.4 changelog yet.<br/>
 
 ## Build
-Run:<br/>
+If you don't have clang, subtitute all `make` commands with `make CC=gcc`.<br/>
+Then run:<br/>
 ```sh
 git clone https://github.com/bloodstalker/luactest
 git submodule init
