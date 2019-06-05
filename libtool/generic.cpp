@@ -2,22 +2,18 @@
 /*first line intentionally left blank.*/
 /***************************************************Project Mutator****************************************************/
 //-*-c++-*-
-// a clang tool blueprint
-/*Copyright (C) 2018 Farzad Sadeghi
+// a simple clang tool.
+/*Copyright (C) 2019 Farzad Sadeghi
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public 
+License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later 
+version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.*/
+You should have received a copy of the GNU General Public License along with this program; if not, write to the 
+Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.*/
 /*code structure inspired by Eli Bendersky's tutorial on Rewriters.*/
 /**********************************************************************************************************************/
 /*included modules*/
@@ -62,11 +58,11 @@ using namespace clang::tooling;
 #endif
 /**********************************************************************************************************************/
 namespace {
-  static llvm::cl::OptionCategory ctbcat("Obfuscator custom options");
-  cl::opt<bool> CheckSystemHeader("SysHeader", cl::desc("match results in sys header also"), cl::init(false), cl::cat(ctbcat), cl::ZeroOrMore);
-  cl::opt<bool> MainFileOnly("MainOnly", cl::desc("only matches in the main file"), cl::init(true), cl::cat(ctbcat), cl::ZeroOrMore);
+  static llvm::cl::OptionCategory lctcat("Obfuscator custom options");
+  cl::opt<bool> CheckSystemHeader("SysHeader", cl::desc("match results in sys header also"), cl::init(false), cl::cat(lctcat), cl::ZeroOrMore);
+  cl::opt<bool> MainFileOnly("MainOnly", cl::desc("only matches in the main file"), cl::init(true), cl::cat(lctcat), cl::ZeroOrMore);
   std::string TEMP_FILE="/tmp/generic_temp";
-  cl::opt<std::string> AutoGenOut("autogen", cl::desc("the complete path to the output file that will hold the Lua wrappers for your functions"), cl::init("./dummy.c"), cl::cat(ctbcat), cl::ZeroOrMore);
+  cl::opt<std::string> AutoGenOut("autogen", cl::desc("the complete path to the output file that will hold the Lua wrappers for your functions"), cl::init("./dummy.c"), cl::cat(lctcat), cl::ZeroOrMore);
 }
 /**********************************************************************************************************************/
 SourceLocation SourceLocationHasMacro(SourceLocation sl, Rewriter &rewrite) {
@@ -82,7 +78,7 @@ SourceLocation getSLSpellingLoc(SourceLocation sl, Rewriter &rewrite) {
   else return sl;
 }
 
-std::string GetLuaRetPushExpr(const clang::Type* TP) {
+std::string GetLuaRetPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
   if (TP->isIntegerType()) {
     return "lua_pushinteger";
   } // integer
@@ -100,49 +96,33 @@ std::string GetLuaRetPushExpr(const clang::Type* TP) {
   return "";
 }
 
-std::string GetLuaParamPushExpr(const clang::Type* TP) {
+std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
   if (TP->isIntegerType()) {
     return "lua_tointeger";
   } // integer
+  if (TP->isAnyCharacterType()) {
+    return "lua_tostring";
+  } // string
   if (TP->isFloatingType()) {
     return "lua_tonumber";
   } // float/number
   if (TP->isRecordType()) {} // struct or union
   if (TP->isPointerType()) {
+    QualType QT = TP->getPointeeType();
+    QT = QT.getCanonicalType();
+    if (QT.getTypePtrOrNull()->isAnyCharacterType()) {
+      return "lua_tostring";
+    }
     return "lua_touserdata";
   } // pointer
   if (TP->isVoidType()) {} // do nothing
   if (TP->isBooleanType()) {
     return "lua_toboolean";
   } // boolean
-  if (TP->isCharType()) {
-    return "lua_tostring";
-  } // string
   if (TP->isEnumeralType()) {} // enumeration
   return "";
 }
 /**********************************************************************************************************************/
-class CalledFunc : public MatchFinder::MatchCallback {
-  public:
-    CalledFunc(Rewriter &Rewrite) : Rewrite(Rewrite) {}
-
-    virtual void run(const MatchFinder::MatchResult &MR) {}
-
-  private:
-    Rewriter &Rewrite;
-};
-/**********************************************************************************************************************/
-class CalledVar : public MatchFinder::MatchCallback {
-  public:
-    CalledVar (Rewriter &Rewrite) : Rewrite(Rewrite) {}
-
-    virtual void run(const MatchFinder::MatchResult &MR) {
-      const VarDecl* VD = MR.Nodes.getNodeAs<clang::VarDecl>("vardecl");
-    }
-
-  private:
-    Rewriter &Rewrite;
-};
 /**********************************************************************************************************************/
 class FuncDecl : public MatchFinder::MatchCallback
 {
@@ -156,134 +136,55 @@ public:
     if (!Devi::IsTheMatchInMainFile(MainFileOnly, MR, SL)) return void();
     
     const ArrayRef<ParmVarDecl*> PVD = FD->parameters();
-    const QualType RT = FD->getReturnType();
-    const clang::Type* TPR = RT.getTypePtr();
+    QualType RT = FD->getReturnType();
+    RT = RT.getCanonicalType();
+    const clang::Type* TPR = RT.getTypePtrOrNull();
     const FunctionDecl* FDef = FD->getDefinition();
+    const ASTContext* ASTC = MR.Context;
+    unsigned NumParam = FD->getNumParams();
     std::string FuncName = FD->getNameAsString();
     std::ofstream fs;
     fs.open(AutoGenOut, std::ios_base::app);
-
-    fs << "function name: " << FuncName << "\t";
-    fs << "return type: " <<   RT.getAsString() << "\t";
-
+    //fs << "function name: " << FuncName << "\t";
+    //fs << "return type: " <<   RT.getAsString() << "\t";
     fs << "int " << FuncName << "_lct(lua_State* ls);"  << "\n";
     fs << "int " << FuncName << "_lct(lua_State* ls) {"  << "\n";
+    //fs << "int arg_count = lua_gettop(ls);\n";
+    fs << "if (" << NumParam << " != lua_gettop(ls)) {\nprintf (\"wrong number of arguments\\n\");\nreturn 0;\n}\n";
     if (FDef) {
+      int back_counter = -NumParam;
+      // pass 1
       for (auto &iter : PVD) {
         QualType QT = iter->getType();
-        const clang::Type* TPP = QT.getTypePtr();
-        fs << "param: " << QT.getAsString() << " ";
-        fs << iter->getNameAsString() << "\t";
+        QT = QT.getCanonicalType();
+        const clang::Type* TPP = QT.getTypePtrOrNull();
+        //fs << "DEBUG:" << QT.getBaseTypeIdentifier()->getName().str() << "\n";
         const NamedDecl* ND = iter->getUnderlyingDecl();
+        fs << QT.getAsString() << " ";
+        fs << iter->getNameAsString() << " = ";
+        fs << GetLuaParamPushExpr(TPP, *ASTC) << "(ls," << back_counter << ");\n";
+        back_counter++;
+      }
+      // pass 2
+      fs << RT.getAsString() << " result_lct" << " = " << FuncName << "(";
+      for (auto &iter : PVD) {
+        fs << iter->getNameAsString();
       }
     }
-    fs << "return 0;\n";
-    fs << "}\n";
+    fs << ");\n";
+    if (TPR) {
+      fs << GetLuaRetPushExpr(TPR, *ASTC) << "(ls, result_lct);\n";
+      fs << "return 1;\n";
+      fs << "}\n";
+    } else {
+      fs << "return 0;\n";
+    }
     fs << "\n";
     fs.close();
   }
 
 private:
   Rewriter &Rewrite;
-};
-/**********************************************************************************************************************/
-class VDecl : public MatchFinder::MatchCallback
-{
-public:
-  VDecl (Rewriter &Rewrite) : Rewrite (Rewrite) {}
-
-  virtual void run(const MatchFinder::MatchResult &MR) {}
-
-private:
-  Rewriter &Rewrite;
-};
-/**********************************************************************************************************************/
-class ClassDecl : public MatchFinder::MatchCallback {
-  public:
-    ClassDecl (Rewriter &Rewrite) : Rewrite(Rewrite) {}
-
-    virtual void run(const MatchFinder::MatchResult &MR) {}
-
-  private:
-    Rewriter &Rewrite;
-};
-/**********************************************************************************************************************/
-class SFCPPARR02SUB : public MatchFinder::MatchCallback
-{
-  public:
-    SFCPPARR02SUB (Rewriter &Rewrite) : Rewrite(Rewrite) {}
-
-    virtual void run(const MatchFinder::MatchResult &MR)
-    {
-      if (MR.Nodes.getNodeAs<clang::DeclRefExpr>("sfcpp02sub") != nullptr)
-      {
-        const DeclRefExpr* DRE = MR.Nodes.getNodeAs<clang::DeclRefExpr>("sfcpp02sub");
-        SourceManager *const SM = MR.SourceManager;
-        SourceLocation SL = DRE->DEVI_GETLOCSTART();
-        CheckSLValidity(SL);
-        SL = SM->getSpellingLoc(SL);
-        if (Devi::IsTheMatchInSysHeader(CheckSystemHeader, MR, SL)) {return void();}
-        if (!Devi::IsTheMatchInMainFile(MainFileOnly, MR, SL)) {return void();}
-        const NamedDecl* ND = DRE->getFoundDecl();
-        SourceLocation OriginSL = ND->DEVI_GETLOCSTART();
-        CheckSLValidity(OriginSL);
-        OriginSL = SM->getSpellingLoc(OriginSL);
-        StringRef OriginFileName [[maybe_unused]] = SM->getFilename(OriginSL);
-
-        if (OriginSL == ExtOriginSL && OriginFileName == ExtOriginFileName) {
-          std::cout << "SaferCPP01" << ":" << "Native Array used - pointer points to an array:" << SL.printToString(*MR.SourceManager) << ":" << DRE->getFoundDecl()->getName().str() << "\n";
-        }
-
-      }
-    }
-
-    void setOriginSourceLocation(SourceLocation inSL)
-    {
-    ExtOriginSL = inSL;
-    }
-
-    void setOriginFileName(StringRef inStrRef)
-    {
-      ExtOriginFileName = inStrRef;
-    }
-
-  private:
-    Rewriter &Rewrite;
-    SourceLocation ExtOriginSL;
-    StringRef ExtOriginFileName;
-};
-/**********************************************************************************************************************/
-/**
- * @brief MatchCallback for safercpp matching of pointers pointing to arrays.
- */
-class SFCPPARR02 : public MatchFinder::MatchCallback
-{
-  public:
-    SFCPPARR02 (Rewriter &Rewrite) : Rewrite(Rewrite), SubHandler(Rewrite) {}
-
-    virtual void run(const MatchFinder::MatchResult &MR)
-    {
-      if (MR.Nodes.getNodeAs<clang::DeclRefExpr>("sfcpparrdeep") != nullptr)
-      {
-        const DeclRefExpr* DRE = MR.Nodes.getNodeAs<clang::DeclRefExpr>("sfcpparrdeep");
-        ASTContext *const ASTC = MR.Context;
-        SourceManager *const SM = MR.SourceManager;
-        SourceLocation SL = DRE->DEVI_GETLOCSTART();
-        CheckSLValidity(SL);
-        SL = SM->getSpellingLoc(SL);
-        const NamedDecl* ND = DRE->getFoundDecl();
-        StringRef NDName = ND->getName();
-        SubHandler.setOriginSourceLocation(SM->getSpellingLoc(ND->DEVI_GETLOCSTART()));
-        SubHandler.setOriginFileName(SM->getFilename(SM->getSpellingLoc(ND->DEVI_GETLOCSTART())));
-        Matcher.addMatcher(declRefExpr(to(varDecl(hasName(NDName.str())))).bind("sfcpp02sub"), &SubHandler);
-        Matcher.matchAST(*ASTC);
-      }
-    }
-
-  private:
-    Rewriter &Rewrite;
-    MatchFinder Matcher;
-    SFCPPARR02SUB SubHandler;
 };
 /**********************************************************************************************************************/
 class PPInclusion : public PPCallbacks
@@ -304,9 +205,6 @@ private:
   Rewriter &Rewrite;
 };
 /**********************************************************************************************************************/
-/**
- * @brief A Clang Diagnostic Consumer that does nothing.
- */
 class BlankDiagConsumer : public clang::DiagnosticConsumer
 {
   public:
@@ -315,20 +213,10 @@ class BlankDiagConsumer : public clang::DiagnosticConsumer
     virtual void HandleDiagnostic(DiagnosticsEngine::Level DiagLevel, const Diagnostic &Info) override {}
 };
 /**********************************************************************************************************************/
-class MyASTConsumer : public ASTConsumer {
+class LCTASTConsumer : public ASTConsumer {
 public:
-  MyASTConsumer(Rewriter &R) : funcDeclHandler(R), HandlerForVar(R), HandlerForClass(R), HandlerForCalledFunc(R), HandlerForCalledVar(R), HandlerForSFCPPARR02(R) {
-#if 1
+  LCTASTConsumer(Rewriter &R) : funcDeclHandler(R) {
     Matcher.addMatcher(functionDecl().bind("funcdecl"), &funcDeclHandler);
-    Matcher.addMatcher(varDecl(anyOf(unless(hasDescendant(expr(anything()))), hasDescendant(expr(anything()).bind("expr")))).bind("vardecl"), &HandlerForVar);
-    Matcher.addMatcher(recordDecl(isClass()).bind("classdecl"), &HandlerForClass);
-    Matcher.addMatcher(declRefExpr().bind("calledvar"), &HandlerForCalledVar);
-    Matcher.addMatcher(varDecl(hasType(arrayType())).bind("sfcpparrdecl"), &HandlerForSFCPPARR02);
-    Matcher.addMatcher(fieldDecl(hasType(arrayType())).bind("sfcpparrfield"), &HandlerForSFCPPARR02);
-    Matcher.addMatcher(implicitCastExpr(hasCastKind(CK_ArrayToPointerDecay)).bind("sfcpparrcastexpr"), &HandlerForSFCPPARR02);
-    Matcher.addMatcher(cStyleCastExpr(hasCastKind(CK_ArrayToPointerDecay)).bind("sfcpparrcastexpr"), &HandlerForSFCPPARR02);
-    Matcher.addMatcher(declRefExpr(hasAncestor(binaryOperator(allOf(hasLHS(declRefExpr().bind("sfcpparrdeep")), hasRHS(hasDescendant(implicitCastExpr(hasCastKind(CK_ArrayToPointerDecay)))), hasOperatorName("="))))), &HandlerForSFCPPARR02);
-#endif
   }
 
   void HandleTranslationUnit(ASTContext &Context) override {
@@ -337,28 +225,21 @@ public:
 
 private:
   FuncDecl funcDeclHandler;
-  VDecl HandlerForVar;
-  ClassDecl HandlerForClass;
-  CalledFunc HandlerForCalledFunc;
-  CalledVar HandlerForCalledVar;
-  SFCPPARR02 HandlerForSFCPPARR02;
   MatchFinder Matcher;
 };
 /**********************************************************************************************************************/
-class ObfFrontendAction : public ASTFrontendAction {
+class LCTFrontendAction : public ASTFrontendAction {
 public:
-  ObfFrontendAction() {}
-  ~ObfFrontendAction() {
+  LCTFrontendAction() {}
+  ~LCTFrontendAction() {
     delete BDCProto;
-    delete tee;
+  }
+
+  bool BeginInvocation(CompilerInstance &CI) override {
+    return true;
   }
 
   void EndSourceFileAction() override {
-    std::error_code EC;
-    std::string OutputFilename = TEMP_FILE;
-    TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-    tee = new raw_fd_ostream(StringRef(OutputFilename), EC, sys::fs::F_None);
-    TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(*tee);
   }
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef file) override {
@@ -366,24 +247,24 @@ public:
     DiagnosticsEngine &DE = CI.getPreprocessor().getDiagnostics();
     DE.setClient(BDCProto, false);
     TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
-    return llvm::make_unique<MyASTConsumer>(TheRewriter);
+    return llvm::make_unique<LCTASTConsumer>(TheRewriter);
   }
 
 private:
   BlankDiagConsumer* BDCProto = new BlankDiagConsumer;
   Rewriter TheRewriter;
-  raw_ostream *tee = &llvm::outs();
 };
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
 /*Main*/
 int main(int argc, const char **argv) {
-  std::fstream fs;
-  //fs.open(AutoGenOut);
-  CommonOptionsParser op(argc, argv, ctbcat);
+  std::ofstream fs;
+  fs.open(AutoGenOut);
+  fs.close();
+  CommonOptionsParser op(argc, argv, lctcat);
   const std::vector<std::string> &SourcePathList = op.getSourcePathList();
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());
-  return Tool.run(newFrontendActionFactory<ObfFrontendAction>().get());
+  return Tool.run(newFrontendActionFactory<LCTFrontendAction>().get());
 }
 /**********************************************************************************************************************/
 /*last line intentionally left blank.*/
