@@ -14,11 +14,11 @@ matrix:
           name: "bloodstalker/luactest"
           description: "Build submitted via Travis CI"
         notification_email: thabogre@gmail.com
-        build_command:   "make CC=gcc"
+        build_command:   "make"
         branch_pattern: master
 
 before_install:
-      - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+      - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
         #- pip install --user cpp-coveralls
 
 before_script: 
@@ -40,7 +40,6 @@ after_failure:
 after_success:
   - gcc -v
   - gcov -v
-  - gcc -v
     #- coveralls --exclude ./json --exclude ./tinyxml2 --exclude-pattern 'clang' --exclude-pattern 'llvm'
     #- gcc -E - <<< '#include<stddef.h>'
     #- gcc -E - <<< '#include<assert.h>'

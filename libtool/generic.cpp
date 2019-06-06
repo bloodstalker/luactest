@@ -110,8 +110,10 @@ std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
   if (TP->isPointerType()) {
     QualType QT = TP->getPointeeType();
     QT = QT.getCanonicalType();
-    if (QT.getTypePtrOrNull()->isAnyCharacterType()) {
-      return "lua_tostring";
+    if (QT.getTypePtrOrNull()) {
+      if (QT.getTypePtrOrNull()->isAnyCharacterType()) {
+        return "lua_tostring";
+      }
     }
     return "lua_touserdata";
   } // pointer
@@ -145,11 +147,8 @@ public:
     std::string FuncName = FD->getNameAsString();
     std::ofstream fs;
     fs.open(AutoGenOut, std::ios_base::app);
-    //fs << "function name: " << FuncName << "\t";
-    //fs << "return type: " <<   RT.getAsString() << "\t";
     fs << "int " << FuncName << "_lct(lua_State* ls);"  << "\n";
     fs << "int " << FuncName << "_lct(lua_State* ls) {"  << "\n";
-    //fs << "int arg_count = lua_gettop(ls);\n";
     fs << "if (" << NumParam << " != lua_gettop(ls)) {\nprintf (\"wrong number of arguments\\n\");\nreturn 0;\n}\n";
     if (FDef) {
       int back_counter = -NumParam;
@@ -158,7 +157,6 @@ public:
         QualType QT = iter->getType();
         QT = QT.getCanonicalType();
         const clang::Type* TPP = QT.getTypePtrOrNull();
-        //fs << "DEBUG:" << QT.getBaseTypeIdentifier()->getName().str() << "\n";
         const NamedDecl* ND = iter->getUnderlyingDecl();
         fs << QT.getAsString() << " ";
         fs << iter->getNameAsString() << " = ";
