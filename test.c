@@ -47,7 +47,6 @@ int str2int(const char* str)
 	return res;
 }
 
-#if 0
 int str2int_lct(lua_State *ls)
 {
 	const char* str = lua_tostring(ls, 1);
@@ -55,4 +54,3 @@ int str2int_lct(lua_State *ls)
 	lua_pushinteger(ls, res);
 	return 1;
 }
-#endif
