@@ -81,32 +81,29 @@ SourceLocation getSLSpellingLoc(SourceLocation sl, Rewriter &rewrite) {
 std::string GetLuaRetPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
   if (TP->isIntegerType()) {
     return "lua_pushinteger";
-  } // integer
-  if (TP->isFloatingType()) {
+  } else if (TP->isFloatingType()) {
     return "lua_pushnumber";
-  } // float/number
-  if (TP->isRecordType()) {} // struct or union
-  if (TP->isPointerType()) {} // pointer
-  if (TP->isVoidType()) {} // do nothing
-  if (TP->isBooleanType()) {} // boolean
-  if (TP->isCharType()) {
+  } else if (TP->isRecordType()) {
+  } else if (TP->isPointerType()) {
+    return "lua_pushlightuserdata";
+  } else if (TP->isVoidType()) {
+  } else if (TP->isBooleanType()) {
+  } else if (TP->isCharType()) {
     return "lua_pushstring";
-  } // string
-  if (TP->isEnumeralType()) {} // enumeration
+  } else if (TP->isEnumeralType()) {
+  } else {
+  }
   return "";
 }
 
 std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
   if (TP->isIntegerType()) {
     return "lua_tointeger";
-  } // integer
-  if (TP->isAnyCharacterType()) {
+  } else if (TP->isAnyCharacterType()) {
     return "lua_tostring";
-  } // string
-  if (TP->isFloatingType()) {
+  } else if (TP->isFloatingType()) {
     return "lua_tonumber";
-  } // float/number
-  if (TP->isRecordType()) {} // struct or union
+  } else if (TP->isRecordType()) {}
   if (TP->isPointerType()) {
     QualType QT = TP->getPointeeType();
     QT = QT.getCanonicalType();
@@ -116,12 +113,12 @@ std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
       }
     }
     return "lua_touserdata";
-  } // pointer
-  if (TP->isVoidType()) {} // do nothing
-  if (TP->isBooleanType()) {
+  } else if (TP->isVoidType()) {
+  } else if (TP->isBooleanType()) {
     return "lua_toboolean";
-  } // boolean
-  if (TP->isEnumeralType()) {} // enumeration
+  } else if (TP->isEnumeralType()) {
+  } else {
+  }
   return "";
 }
 /**********************************************************************************************************************/
@@ -167,6 +164,11 @@ public:
       fs << RT.getAsString() << " result_lct" << " = " << FuncName << "(";
       for (auto &iter : PVD) {
         fs << iter->getNameAsString();
+        if (NumParam > 1) {
+          if (iter != PVD.back()) {
+            fs << ",";
+          }
+        }
       }
     }
     fs << ");\n";

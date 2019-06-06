@@ -41,7 +41,7 @@ int devi_find_last_word(char const * const str, char* delimiters, int delimiter_
   for (int i = str_len -1; i >=0; --i) {
     for (int j = 0; j < delimiter_size;++j) {
       if (delimiters[j] == str[i]) {
-        return i;
+        return i + 1;
       } else {
       }
     }
@@ -72,23 +72,79 @@ size_t devi_rfind(char const * const str, char const * const substr) {
   return -1;
 }
 
+size_t devi_lfind(char const * const str, char const * const substr) {
+  size_t str_len = get_str_len(str);
+  size_t substr_len = get_str_len(substr);
+  for (size_t i = 0; i < str_len; ++i) {
+    if (substr[0] != str[i]) {
+      continue;
+    } else {
+      bool matched = true;
+      for (size_t j = 0; j < substr_len; ++j) {
+        if (i + j >= str_len) return -1;
+        if (substr[j] == str[i+j]) {
+          continue;
+        } else {
+          matched = false;
+        }
+      }
+      if (matched) return (i);
+    }
+  }
+
+  return -1;
+}
+
 void shell_completion(const char* buf, linenoiseCompletions* lc) {
-  if (buf != NULL) {
-    for(int i=0; i < sizeof(LUA_FUNCS)/sizeof(LUA_FUNCS[0]); ++i) {
-      if (strcmp(LUA_FUNCS[i], buf) >= 0) {
-        linenoiseAddCompletion(lc, LUA_FUNCS[i]);
+  if (NULL != buf) {
+    int last_word_index = devi_find_last_word(buf, ID_BREAKERS, NELEMS(ID_BREAKERS));
+    //printf("\nlast_word_index:%d\n", last_word_index);
+    char* last_word = malloc(strlen(buf) - last_word_index+1);
+    last_word[strlen(buf) - last_word_index] = '\0';
+    memcpy(last_word, &buf[last_word_index], strlen(buf) - last_word_index);
+    //printf("\nlast_word:%s\n", last_word);
+    //char* linenoise_completion = malloc(strlen(buf) + );
+    char* ln_matched;
+    for(int i=0; i < NELEMS(LUA_FUNCS); ++i) {
+      if ( 0 == devi_lfind(LUA_FUNCS[i], last_word)) {
+        ln_matched = malloc(last_word_index + strlen(LUA_FUNCS[i]) + 1);
+        ln_matched[last_word_index + strlen(LUA_FUNCS[i]) + 1] = '\0';
+        memcpy(ln_matched, buf, last_word_index);
+        memcpy(&ln_matched[last_word_index], LUA_FUNCS[i], strlen(LUA_FUNCS[i]));
+        //printf("\nln_matche:%s\n", ln_matched);
+        linenoiseAddCompletion(lc, ln_matched);
+        free(ln_matched);
+        //linenoiseAddCompletion(lc, LUA_FUNCS[i]);
+        //break;
       }
     }
+    free(last_word);
   }
 }
 
 char* shell_hint(const char* buf, int* color, int* bold) {
-  if (!strcasecmp(buf,"hello")) {
-        *color = 35;
-        *bold = 0;
-        return " World";
+  if (NULL != buf) {
+      *color = 35;
+      *bold = 0;
     }
-    return NULL;
+  int last_word_index = devi_find_last_word(buf, ID_BREAKERS, NELEMS(ID_BREAKERS));
+  char* last_word = malloc(strlen(buf) - last_word_index+1);
+  last_word[strlen(buf) - last_word_index] = '\0';
+  memcpy(last_word, &buf[last_word_index], strlen(buf) - last_word_index);
+  char* ln_matched;
+  for(int i=0; i < NELEMS(LUA_FUNCS); ++i) {
+    size_t match_index = devi_lfind(LUA_FUNCS[i], last_word);
+    if (0 == match_index) {
+      ln_matched = malloc(strlen(LUA_FUNCS[i])-strlen(last_word)+1);
+      ln_matched[strlen(LUA_FUNCS[i]) - strlen(last_word)] = '\0';
+      memcpy(ln_matched, &LUA_FUNCS[i][match_index+strlen(last_word)], strlen(LUA_FUNCS[i]) - strlen(last_word));
+      //memcpy(&ln_matched[last_word_index], LUA_FUNCS[i], strlen(LUA_FUNCS[i]));
+      free(last_word);
+      return ln_matched;
+    }
+  }
+  free(last_word);
+  return NULL;
 }
 
 void lct_reg_all(lua_State * ls)
