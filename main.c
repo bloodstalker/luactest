@@ -18,6 +18,17 @@
 #define H_FILE "./lct_history.lua"
 #define LUA_RC "./defaults.lua"
 /**************************************************************************************************/
+lua_State* ls;
+
+void get_lua_global_table(lua_State* ls) {
+  lua_pushglobaltable(ls);
+  lua_pushnil(ls);
+  while(0 != lua_next(ls, -2)) {
+    printf("%s\n", lua_tostring(ls, -2));
+    lua_pop(ls, 1);
+  }
+  lua_pop(ls, 1);
+}
 
 size_t get_str_len(const char* str) {
   int size_counter = 0;
@@ -154,7 +165,8 @@ int main (int argc, char** argv) {
   linenoiseSetMultiLine(1);
 
   //int status, result;
-  lua_State *ls = luaL_newstate();
+  //lua_State *ls = luaL_newstate();
+  ls = luaL_newstate();
   if (ls == NULL) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
@@ -162,6 +174,7 @@ int main (int argc, char** argv) {
 
   luaL_openlibs(ls);
   lct_reg_all(ls);
+  get_lua_global_table(ls);
   dofile(ls, LUA_RC);
   // cli execution loop
   while (NULL != (command = linenoise("lct-0.1>>>"))) {
