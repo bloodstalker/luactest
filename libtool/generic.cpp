@@ -61,8 +61,13 @@ namespace {
   static llvm::cl::OptionCategory lctcat("Obfuscator custom options");
   cl::opt<bool> CheckSystemHeader("SysHeader", cl::desc("match results in sys header also"), cl::init(false), cl::cat(lctcat), cl::ZeroOrMore);
   cl::opt<bool> MainFileOnly("MainOnly", cl::desc("only matches in the main file"), cl::init(true), cl::cat(lctcat), cl::ZeroOrMore);
-  std::string TEMP_FILE="/tmp/generic_temp";
+  cl::opt<bool> LuaWrap("luawrap", cl::desc("enable lua wrapper functionality"), cl::init(false), cl::cat(lctcat), cl::ZeroOrMore);
+  cl::opt<bool> FuncDump("funcdump", cl::desc("enable function dump functionality"), cl::init(false), cl::cat(lctcat), cl::ZeroOrMore);
+  cl::opt<bool> CallCount("callcounter", cl::desc("enable the call counting funcitonality"), cl::init(false), cl::cat(lctcat), cl::ZeroOrMore);
   cl::opt<std::string> AutoGenOut("autogen", cl::desc("the complete path to the output file that will hold the Lua wrappers for your functions"), cl::init("./dummy.c"), cl::cat(lctcat), cl::ZeroOrMore);
+  cl::list<std::string> FuncDumpList("funcdumplist", cl::desc("dumps functions that match the name"), cl::cat(lctcat), cl::ZeroOrMore, cl::CommaSeparated);
+  cl::opt<std::string> FuncDumpPath("funcdumppath", cl::desc("path to dump functions to, for --funcdump"), cl::init("./dump.c"), cl::cat(lctcat), cl::ZeroOrMore);
+  cl::opt<std::string> CallCountName("callcountname", cl::desc("the name of the function to count calls for"), cl::init("./dummy.c"), cl::cat(lctcat), cl::ZeroOrMore);
 }
 /**********************************************************************************************************************/
 SourceLocation SourceLocationHasMacro(SourceLocation sl, Rewriter &rewrite) {
@@ -123,72 +128,127 @@ std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
 }
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
-class FuncDecl : public MatchFinder::MatchCallback
-{
+class FuncDecl : public MatchFinder::MatchCallback {
 public:
-  FuncDecl (Rewriter &Rewrite) : Rewrite (Rewrite) {}
+  FuncDecl (Rewriter &Rewrite) : Rewrite (Rewrite) {
+    if ("" != FuncDumpPath) {
+      funcdump_out.open(FuncDumpPath, std::ios::out);
+    } else {
+      funcdump_out.open("./dump.c", std::ios::out);
+    }
+  }
+
+  ~FuncDecl() {
+    funcdump_out.close();
+  }
 
   virtual void run(const MatchFinder::MatchResult &MR) {
-    const FunctionDecl* FD = MR.Nodes.getNodeAs<clang::FunctionDecl>("funcdecl");
+    const FunctionDecl* FD = MR.Nodes.getNodeAs<clang::FunctionDecl>("funcdecllua");
     SourceLocation SL = FD->getSourceRange().getBegin();
     if (Devi::IsTheMatchInSysHeader(CheckSystemHeader, MR, SL)) return void();
     if (!Devi::IsTheMatchInMainFile(MainFileOnly, MR, SL)) return void();
-    
-    const ArrayRef<ParmVarDecl*> PVD = FD->parameters();
-    QualType RT = FD->getReturnType();
-    RT = RT.getCanonicalType();
-    const clang::Type* TPR = RT.getTypePtrOrNull();
-    const FunctionDecl* FDef = FD->getDefinition();
-    const ASTContext* ASTC = MR.Context;
-    unsigned NumParam = FD->getNumParams();
     std::string FuncName = FD->getNameAsString();
-    std::ofstream fs;
-    fs.open(AutoGenOut, std::ios_base::app);
-    fs << "int " << FuncName << "_lct(lua_State* ls);"  << "\n";
-    fs << "int " << FuncName << "_lct(lua_State* ls) {"  << "\n";
-    fs << "if (" << NumParam << " != lua_gettop(ls)) {\nprintf (\"wrong number of arguments\\n\");\nreturn 0;\n}\n";
-    if (FDef) {
-      int back_counter = -NumParam;
-      // pass 1
-      for (auto &iter : PVD) {
-        QualType QT = iter->getType();
-        QT = QT.getCanonicalType();
-        const clang::Type* TPP = QT.getTypePtrOrNull();
-        const NamedDecl* ND = iter->getUnderlyingDecl();
-        fs << QT.getAsString() << " ";
-        fs << iter->getNameAsString() << " = ";
-        fs << GetLuaParamPushExpr(TPP, *ASTC) << "(ls," << back_counter << ");\n";
-        back_counter++;
-      }
-      // pass 2
-      fs << RT.getAsString() << " result_lct" << " = " << FuncName << "(";
-      for (auto &iter : PVD) {
-        fs << iter->getNameAsString();
-        if (NumParam > 1) {
-          if (iter != PVD.back()) {
-            fs << ",";
+    
+    if (LuaWrap) {
+      const ArrayRef<ParmVarDecl*> PVD = FD->parameters();
+      QualType RT = FD->getReturnType();
+      RT = RT.getCanonicalType();
+      const clang::Type* TPR = RT.getTypePtrOrNull();
+      const FunctionDecl* FDef = FD->getDefinition();
+      const ASTContext* ASTC = MR.Context;
+      unsigned NumParam = FD->getNumParams();
+      std::ofstream fs;
+      fs.open(AutoGenOut, std::ios_base::app);
+      fs << "int " << FuncName << "_lct(lua_State* ls);"  << "\n";
+      fs << "int " << FuncName << "_lct(lua_State* ls) {"  << "\n";
+      fs << "if (" << NumParam << " != lua_gettop(ls)) {\nprintf (\"wrong number of arguments\\n\");\nreturn 0;\n}\n";
+      if (FDef) {
+        int back_counter = -NumParam;
+        // pass 1
+        for (auto &iter : PVD) {
+          QualType QT = iter->getType();
+          QT = QT.getCanonicalType();
+          const clang::Type* TPP = QT.getTypePtrOrNull();
+          const NamedDecl* ND = iter->getUnderlyingDecl();
+          fs << QT.getAsString() << " ";
+          fs << iter->getNameAsString() << " = ";
+          fs << GetLuaParamPushExpr(TPP, *ASTC) << "(ls," << back_counter << ");\n";
+          back_counter++;
+        }
+        // pass 2
+        fs << RT.getAsString() << " result_lct" << " = " << FuncName << "(";
+        for (auto &iter : PVD) {
+          fs << iter->getNameAsString();
+          if (NumParam > 1) {
+            if (iter != PVD.back()) {
+              fs << ",";
+            }
           }
         }
       }
+      fs << ");\n";
+      if (TPR) {
+        fs << GetLuaRetPushExpr(TPR, *ASTC) << "(ls, result_lct);\n";
+        fs << "return 1;\n";
+        fs << "}\n";
+      } else {
+        fs << "return 0;\n";
+      }
+      fs << "\n";
+      fs.close();
     }
-    fs << ");\n";
-    if (TPR) {
-      fs << GetLuaRetPushExpr(TPR, *ASTC) << "(ls, result_lct);\n";
-      fs << "return 1;\n";
-      fs << "}\n";
-    } else {
-      fs << "return 0;\n";
+
+    if (FuncDump) {
+      for(int i = 0; i < FuncDumpList.size(); ++i)
+      {
+        if (FuncName == FuncDumpList[i]) {
+          SourceLocation SLE = FD->getSourceRange().getEnd();
+          funcdump_out << Rewrite.getRewrittenText(SourceRange(SL, SLE)) << "\n";
+        }
+      }
     }
-    fs << "\n";
-    fs.close();
   }
 
 private:
   Rewriter &Rewrite;
+  std::ofstream funcdump_out;
 };
 /**********************************************************************************************************************/
-class PPInclusion : public PPCallbacks
-{
+class CallCounter : public MatchFinder::MatchCallback {
+public:
+  CallCounter (Rewriter &Rewrite) : Rewrite (Rewrite) {
+    Call_Count = 0;
+  }
+
+  ~CallCounter() {
+    std::cout << "fincal call count is " << Call_Count << ".\n";
+  }
+
+  virtual void run(const MatchFinder::MatchResult &MR) {
+    const CallExpr* CE = MR.Nodes.getNodeAs<clang::CallExpr>("callcounter");
+    SourceLocation SL = CE->getSourceRange().getBegin();
+    if (Devi::IsTheMatchInSysHeader(CheckSystemHeader, MR, SL)) return void();
+    if (!Devi::IsTheMatchInMainFile(MainFileOnly, MR, SL)) return void();
+
+    auto Callee = CE->getDirectCallee();
+    if (!Callee) return void();
+
+    std::string FuncName = Callee->getNameAsString();
+    SourceLocation SLE = CE->getSourceRange().getBegin();
+    auto SM = MR.SourceManager;
+
+    if (FuncName == CallCountName) {
+      Call_Count++;
+      std::cout << SL.printToString(*SM) << ":" << SLE.printToString(*SM) << ":" << Call_Count << "\n";
+    }
+  }
+
+private:
+  Rewriter &Rewrite;
+  uint32_t Call_Count;
+};
+/**********************************************************************************************************************/
+class PPInclusion : public PPCallbacks {
 public:
   explicit PPInclusion (SourceManager *SM, Rewriter *Rewrite) : SM(*SM), Rewrite(*Rewrite) {}
 
@@ -205,8 +265,7 @@ private:
   Rewriter &Rewrite;
 };
 /**********************************************************************************************************************/
-class BlankDiagConsumer : public clang::DiagnosticConsumer
-{
+class BlankDiagConsumer : public clang::DiagnosticConsumer {
   public:
     BlankDiagConsumer() = default;
     virtual ~BlankDiagConsumer() {}
@@ -215,8 +274,14 @@ class BlankDiagConsumer : public clang::DiagnosticConsumer
 /**********************************************************************************************************************/
 class LCTASTConsumer : public ASTConsumer {
 public:
-  LCTASTConsumer(Rewriter &R) : funcDeclHandler(R) {
-    Matcher.addMatcher(functionDecl().bind("funcdecl"), &funcDeclHandler);
+  LCTASTConsumer(Rewriter &R) : funcDeclHandler(R), callCounterHandler(R)  {
+    if (LuaWrap || FuncDump) {
+      Matcher.addMatcher(functionDecl().bind("funcdecllua"), &funcDeclHandler);
+    }
+
+    if (CallCount) {
+      Matcher.addMatcher(callExpr().bind("callcounter"), &callCounterHandler);
+    }
   }
 
   void HandleTranslationUnit(ASTContext &Context) override {
@@ -225,6 +290,7 @@ public:
 
 private:
   FuncDecl funcDeclHandler;
+  CallCounter callCounterHandler;
   MatchFinder Matcher;
 };
 /**********************************************************************************************************************/
