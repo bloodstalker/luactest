@@ -29,7 +29,7 @@ flags = [
     '-isystem', '/usr/local/include',
     '-I', 'include',
     '-I.',
-    '-I$(llvm-config --src-root)/tools/clang/include'
+    '-I$(llvm-config --src-root)/tools/clang/include',
     '-I$(llvm-config --obj-root)/tools/clang/include'
 ]
 

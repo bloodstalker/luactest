@@ -20,14 +20,14 @@
 /**************************************************************************************************/
 lua_State* ls;
 
-void get_lua_global_table(lua_State* ls) {
-  lua_pushglobaltable(ls);
-  lua_pushnil(ls);
-  while(0 != lua_next(ls, -2)) {
-    printf("%s\n", lua_tostring(ls, -2));
-    lua_pop(ls, 1);
+void get_lua_global_table(lua_State* _ls) {
+  lua_pushglobaltable(_ls);
+  lua_pushnil(_ls);
+  while(0 != lua_next(_ls, -2)) {
+    printf("%s\n", lua_tostring(_ls, -2));
+    lua_pop(_ls, 1);
   }
-  lua_pop(ls, 1);
+  lua_pop(_ls, 1);
 }
 
 size_t get_str_len(const char* str) {
@@ -54,6 +54,7 @@ int devi_find_last_word(char const * const str, char* delimiters, int delimiter_
       if (delimiters[j] == str[i]) {
         return i + 1;
       } else {
+        /*intentionally left blank*/
       }
     }
   }
@@ -151,9 +152,9 @@ char* shell_hint(const char* buf, int* color, int* bold) {
   return NULL;
 }
 
-void lct_reg_all(lua_State * ls)
+void lct_reg_all(lua_State * _ls)
 {
-  lua_register(ls, "str2int", str2int_lct);
+  lua_register(_ls, "str2int", str2int_lct);
 }
 /**************************************************************************************************/
 int main (int argc, char** argv) {
