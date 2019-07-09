@@ -52,35 +52,6 @@ int devi_find_last_word(char const * const str, char* delimiters, int delimiter_
   return 0;
 }
 
-int devi_find_last_word_bi(char const * const str, char* delimiters, int delimiter_size) {
-  size_t str_len = get_str_len(str);
-  bool is_delimiter = false;
-
-  for (int i = 0; i < delimiter_size; ++i) {
-    if (delimiters[i] == str[str_len-1]) return -1;
-  }
-
-  for (int i = str_len -1; i >=0; --i) {
-    for (int j = 0; j < delimiter_size;++j) {
-      if (delimiters[j] == str[i]) {
-        return i + 1;
-      } else {
-        /*intentionally left blank*/
-      }
-    }
-  }
-
-  return 0;
-}
-
-size_t devi_rfind(char const * const str, char const * const substr) {
-  size_t str_len = get_str_len(str);
-  size_t substr_len = get_str_len(substr);
-  for (size_t i = str_len-1; i >=0 ; --i) {
-    if (substr[substr_len-1] != str[i]) {
-      continue;
-    } else {
-      bool matched = true;
 size_t devi_rfind(char const * const str, char const * const substr) {
   size_t str_len = get_str_len(str);
   size_t substr_len = get_str_len(substr);
@@ -237,7 +208,7 @@ int main (int argc, char** argv) {
 
   luaL_openlibs(ls);
   lct_reg_all(ls);
-  get_lua_global_table(ls);
+  //get_lua_global_table(ls);
   dofile(ls, LUA_RC);
   // cli execution loop
   while (NULL != (command = linenoise("lct-0.1>>>"))) {
