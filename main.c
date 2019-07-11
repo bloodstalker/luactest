@@ -146,6 +146,7 @@ void shell_completion(const char* buf, linenoiseCompletions* lc) {
 }
 
 char* shell_hint(const char* buf, int* color, int* bold) {
+  printf(" %s ", buf);
   if (NULL != buf) {
       *color = 35;
       *bold = 0;

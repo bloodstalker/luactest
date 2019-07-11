@@ -1,6 +1,3 @@
-[submodule "linenoise"]
-	path = linenoise
-	url = https://github.com/antirez/linenoise
 [submodule "libtool/cfe-extra"]
 	path = libtool/cfe-extra
 	url = https://github.com/bloodstalker/cfe-extra
