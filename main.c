@@ -108,7 +108,7 @@ void get_lua_global_table(lua_State* _ls) {
   lua_pop(_ls, 1);
 }
 
-void shell_completion(const char* buf, linenoiseCompletions* lc) {
+void shell_completion(const char* buf, linenoiseCompletions* lc, size_t pos) {
   if (NULL != buf) {
     int last_word_index = devi_find_last_word(buf, ID_BREAKERS, NELEMS(ID_BREAKERS));
     char* last_word = malloc(strlen(buf) - last_word_index+1);
@@ -121,7 +121,7 @@ void shell_completion(const char* buf, linenoiseCompletions* lc) {
         ln_matched[last_word_index + strlen(LUA_FUNCS[i])] = '\0';
         memcpy(ln_matched, buf, last_word_index);
         memcpy(&ln_matched[last_word_index], LUA_FUNCS[i], strlen(LUA_FUNCS[i]));
-        linenoiseAddCompletion(lc, ln_matched);
+        linenoiseAddCompletion(lc, ln_matched, pos);
         free(ln_matched);
       }
     }
@@ -134,7 +134,7 @@ void shell_completion(const char* buf, linenoiseCompletions* lc) {
         ln_matched[last_word_index + strlen(lua_tostring(ls, -2))] = '\0';
         memcpy(ln_matched, buf, last_word_index);
         memcpy(&ln_matched[last_word_index], lua_tostring(ls, -2), strlen(lua_tostring(ls, -2)));
-        linenoiseAddCompletion(lc, ln_matched);
+        linenoiseAddCompletion(lc, ln_matched, pos);
         free(ln_matched);
       }
       lua_pop(ls, 1);
