@@ -4,3 +4,6 @@
 [submodule "luatablegen"]
 	path = luatablegen
 	url = https://github.com/bloodstalker/luatablegen
+[submodule "linenoise"]
+	path = linenoise
+	url = https://github.com/bloodstalker/linenoise
