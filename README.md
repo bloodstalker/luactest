@@ -1,6 +1,6 @@
-
 [![Build Status](https://travis-ci.org/bloodstalker/luactest.svg?branch=master)](https://travis-ci.org/bloodstalker/luactest)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/bloodstalker/luactest.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/bloodstalker/luactest/alerts/)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbloodstalker%2Fluactest.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbloodstalker%2Fluactest?ref=badge_shield)
 <a href="https://scan.coverity.com/projects/bloodstalker-luactest">
   <img alt="Coverity Scan Build Status"
        src="https://img.shields.io/coverity/scan/18518.svg"/>
@@ -36,3 +36,7 @@ make
 
 To build the libtooling tool run make under `libtool` directory.<br/>
 The tool right now should support LLVM 5,6,8 and 9(latest tested trunk:355787).<br/>
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fbloodstalker%2Fluactest.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fbloodstalker%2Fluactest?ref=badge_large)
