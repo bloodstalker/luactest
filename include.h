@@ -3,6 +3,11 @@
 #define __maybe_unused__ __attribute__((unused))
 #define NELEMS(x) (sizeof(x)/sizeof(x[0]))
 
+typedef struct{
+  size_t begin;
+  size_t end;
+}word_pos_t;
+
 char *LUA_FUNCS[] = {
   "_G",
   "_VERSION",

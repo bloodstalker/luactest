@@ -21,7 +21,7 @@ before_install:
       - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
         #- pip install --user cpp-coveralls
 
-before_script: 
+before_script:
 #- sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 #- sudo add-apt-repository ppa:fkrull/deadsnakes -y
 #- sudo apt-get update -y
@@ -30,9 +30,12 @@ before_script:
   - luarocks install ansicolors --local
   - git submodule init
   - git submodule update
+    #- "curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | sudo bash"
 
-script: 
+script:
   - make -j2
+    #- fossa init
+    #- fossa analyze
 
 after_failure:
   - find . -maxdepth 1 -name "core*"
