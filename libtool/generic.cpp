@@ -221,7 +221,9 @@ public:
   }
 
   ~CallCounter() {
-    std::cout << "fincal call count is " << Call_Count << ".\n";
+    if (CallCount) {
+      std::cout << "fincal call count is " << Call_Count << ".\n";
+    }
   }
 
   virtual void run(const MatchFinder::MatchResult &MR) {

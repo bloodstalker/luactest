@@ -217,7 +217,7 @@ void shell_completion(const char* buf, linenoiseCompletions* lc, size_t pos) {
   }
 }
 
-// we cant really give hints mid-buffer in linenoise
+// we cant really give hints mid-buffer in linenoise or can we???
 char* shell_hint(const char* buf, int* color, int* bold) {
   if (NULL != buf) {
       *color = 35;
