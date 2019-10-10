@@ -103,7 +103,7 @@ $(TARGET): $(TARGET).o ./cfe-extra/cfe_extra.o
 $(TARGET)-static: $(TARGET).o
 	$(CXX) $^ $(LD_FLAGS) -static -o $@
 
-$(TARGET)-dbg: $(TARGET).odbg
+$(TARGET)-dbg: $(TARGET).odbg ./cfe-extra/cfe_extra.o
 	$(CXX) $^ $(LD_FLAGS) -g -o $@
 
 $(TARGET)-cov: $(TARGET).ocov
