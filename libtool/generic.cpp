@@ -84,6 +84,7 @@ SourceLocation getSLSpellingLoc(SourceLocation sl, Rewriter &rewrite) {
 }
 
 std::string GetLuaRetPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
+  /* @trace 1.1.1.1 */
   if (TP->isIntegerType()) {
     return "lua_pushinteger";
   } else if (TP->isFloatingType()) {
@@ -102,6 +103,8 @@ std::string GetLuaRetPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
 }
 
 std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
+  /* @trace 2.2.2.2 - 3.3.3.3 */
+  /* @trace 4.4.4.4 */
   if (TP->isIntegerType()) {
     return "lua_tointeger";
   } else if (TP->isAnyCharacterType()) {
@@ -128,6 +131,7 @@ std::string GetLuaParamPushExpr(const clang::Type* TP, const ASTContext &ASTC) {
 }
 /**********************************************************************************************************************/
 /**********************************************************************************************************************/
+/* 3.4.2.1 */
 class FuncDecl : public MatchFinder::MatchCallback {
 public:
   FuncDecl (Rewriter &Rewrite) : Rewrite (Rewrite) {

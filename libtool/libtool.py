@@ -7,6 +7,7 @@ import readline
 import signal
 import sys
 import subprocess
+import re
 
 if sys.version_info < (3, 7):
     shell_result = subprocess.run(["llvm-config", "--src-root"], stdout=subprocess.PIPE)
@@ -17,36 +18,87 @@ sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/tools/clang/bind
 import llvm
 import clang.cindex
 clang.cindex.Config.set_library_file("/home/bloodstalker/extra/llvm-clang-4/build/lib/libclang.so")
+from clang import enumerations as clangenums
+
 
 def SigHandler_SIGINT(signum, frame):
     print()
     sys.exit(0)
 
+
 class Argparser(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("--file", type=str, help="string")
-        parser.add_argument("--symbol", type=str, help="string")
-        parser.add_argument("--bool", action="store_true", help="bool", default=False)
+        parser.add_argument("--file", nargs="+", type=str, help="comma-separated list of files.")
+        parser.add_argument("--outtype", type=str, default="csv", help="the output type. default is \"csv\".")
+        parser.add_argument("--fs", type=str, default="|", help="only meaningful when outtype is set to csv. default is \"|\".")
         parser.add_argument("--dbg", action="store_true", help="debug", default=False)
         self.args = parser.parse_args()
+
 
 def find_typerefs(node, typename):
     if node.kind.is_reference():
         #print(node.spelling)
-        if node.spelling == typename:
+        #print(node.displayname)
+        if node.spelling == "class std::" + typename:
             print("Found %s [Line=%s, Col=%s]"%(typename, node.location.line, node.location.column))
     for c in node.get_children():
         find_typerefs(c, typename)
+
+
+def getParentFunctionDeclIfAny(cursor):
+    if cursor.semantic_parent.kind == None:
+        return None
+    elif cursor.semantic_parent.kind == clang.cindex.CursorKind.FUNCTION_DECL:
+        return cursor.semantic_parent
+    else:
+        getParentFunctionDecl(cursor.semantic_parent)
+
+
+def getReqIDIfAny(raw_comment):
+    reqIDRegEx = "\s([1-9](\.[1-9])*?)\s"
+    return re.findall(reqIDRegEx, raw_comment)
+
+
+def generateOutput(traceability_list, argparser):
+    if argparser.args.outtype == "csv":
+        fs = argparser.args.fs
+        for elem in traceability_list:
+            dump = str()
+            for subelem in elem:
+                dump += subelem + fs
+            print(dump)
+
 
 # write code here
 def premain(argparser):
     signal.signal(signal.SIGINT, SigHandler_SIGINT)
     #here
-    index = clang.cindex.Index.create()
-    tu = index.parse(argparser.args.file)
-    print("TU:", tu.spelling)
-    find_typerefs(tu.cursor, argparser.args.symbol)
+    traceability_list = []
+    if argparser.args.file is not None:
+        for src_file in argparser.args.file:
+            index = clang.cindex.Index.create()
+            tu = index.parse(src_file)
+            #print("TU:", tu.spelling)
+            #find_typerefs(tu.cursor, argparser.args.symbol)
+            for token in tu.cursor.get_tokens():
+                if token.kind == clang.cindex.TokenKind.COMMENT:
+                    if token.spelling.find("@trace") != -1:
+                        src_range = token.extent
+                        cursor = token.cursor
+                        declFunc = getParentFunctionDeclIfAny(token.cursor)
+                        if declFunc.spelling != None:
+                            req_id = getReqIDIfAny(token.spelling)
+                            for match_group in req_id:
+                                traceability_list.append([declFunc.spelling, match_group[0], repr(declFunc.location.line),
+                                    repr(declFunc.location.column), repr(declFunc.location.file), repr(token.location.line),
+                                    repr(token.location.column), repr(token.location.file)])
+    else:
+        print("you have to specify the name of the file...")
+
+    if len(traceability_list) > 0:
+        generateOutput(traceability_list, argparser)
+
 
 def main():
     argparser = Argparser()
@@ -64,6 +116,7 @@ def main():
             shell.interact(banner="DEBUG REPL")
     else:
         premain(argparser)
+
 
 if __name__ == "__main__":
     main()
