@@ -7,11 +7,16 @@ import readline
 import signal
 import sys
 import subprocess
-shell_result = subprocess.run(["llvm-config", "--src-root"], capture_output=True)
+
+if sys.version_info < (3, 7):
+    shell_result = subprocess.run(["llvm-config", "--src-root"], stdout=subprocess.PIPE)
+else:
+    shell_result = subprocess.run(["llvm-config", "--src-root"], capture_output=True)
 sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/bindings/python")
 sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/tools/clang/bindings/python")
 import llvm
 import clang.cindex
+clang.cindex.Config.set_library_file("/home/bloodstalker/extra/llvm-clang-4/build/lib/libclang.so")
 
 def SigHandler_SIGINT(signum, frame):
     print()
