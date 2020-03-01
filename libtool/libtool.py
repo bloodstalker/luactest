@@ -8,16 +8,24 @@ import signal
 import sys
 import subprocess
 import re
+import os
 
 if sys.version_info < (3, 7):
     shell_result = subprocess.run(["llvm-config", "--src-root"], stdout=subprocess.PIPE)
 else:
     shell_result = subprocess.run(["llvm-config", "--src-root"], capture_output=True)
-sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/bindings/python")
-sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/tools/clang/bindings/python")
-import llvm
+
+#@FIXME-for some reason cygwin doesnt like to unpack the source files so we have to use this trashy way to import the python bindings.
+if os.uname().sysname.find("CYGWIN") != -1:
+    sys.path.insert(0, "/cygdrive/d/LLVM/llvm-8.0.1.src/bindings/python")
+    sys.path.insert(0, "/cygdrive/d/LLVM/cfe-8.0.1.src/bindings/python")
+else:
+    sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/bindings/python")
+    sys.path.insert(0, shell_result.stdout.decode("utf-8")[:-1] + "/tools/clang/bindings/python")
+
 import clang.cindex
-clang.cindex.Config.set_library_file("/home/bloodstalker/extra/llvm-clang-4/build/lib/libclang.so")
+import llvm
+clang.cindex.Config.set_library_file("/cygdrive/c/Program Files/LLVM8/bin/libclang.dll")
 from clang import enumerations as clangenums
 
 
@@ -30,6 +38,7 @@ class Argparser(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument("--file", nargs="+", type=str, help="comma-separated list of files.")
+        parser.add_argument("--compdb", type=str, help="path to compilation database directory, not the file itself.")
         parser.add_argument("--outtype", type=str, default="csv", help="the output type. default is \"csv\".")
         parser.add_argument("--fs", type=str, default="|", help="only meaningful when outtype is set to csv. default is \"|\".")
         parser.add_argument("--dbg", action="store_true", help="debug", default=False)
@@ -69,18 +78,34 @@ def generateOutput(traceability_list, argparser):
                 dump += subelem + fs
             print(dump)
 
+def getListAsString(traceability_list, argparser):
+    fs = argparser.args.fs
+    dump = str()
+    for elem in traceability_list:
+        for subelem in elem:
+            dump += subelem + fs
+        dump += "\n"
+    return dump
+
+
+def getcompbase(source_file_path, compbase_path):
+    compdb = clang.cindex.CompilationDatabase.fromDirectory(compbase_path)
+    compcomms = compdb.getCompileCommands(source_file_path)
+    return compcomms
+
 
 # write code here
 def premain(argparser):
     signal.signal(signal.SIGINT, SigHandler_SIGINT)
     #here
     traceability_list = []
+    traceability_list.append(["Requirement ID", "Function name", "Function line", "Function column", 
+        "Function file", "comment line", "comment column", "comment file"])
     if argparser.args.file is not None:
         for src_file in argparser.args.file:
+            compile_command = getcompbase(src_file, argparser.args.compdb)
             index = clang.cindex.Index.create()
             tu = index.parse(src_file)
-            #print("TU:", tu.spelling)
-            #find_typerefs(tu.cursor, argparser.args.symbol)
             for token in tu.cursor.get_tokens():
                 if token.kind == clang.cindex.TokenKind.COMMENT:
                     if token.spelling.find("@trace") != -1:
@@ -88,16 +113,25 @@ def premain(argparser):
                         cursor = token.cursor
                         declFunc = getParentFunctionDeclIfAny(token.cursor)
                         if declFunc.spelling != None:
-                            req_id = getReqIDIfAny(token.spelling)
-                            for match_group in req_id:
-                                traceability_list.append([declFunc.spelling, match_group[0], repr(declFunc.location.line),
-                                    repr(declFunc.location.column), repr(declFunc.location.file), repr(token.location.line),
-                                    repr(token.location.column), repr(token.location.file)])
+                            #req_id = getReqIDIfAny(token.spelling)
+                            req_id = token.spelling.strip()
+                            req_id = req_id.strip("/")
+                            req_id = req_id.strip("*")
+                            req_id = req_id[7:]
+                            req_id = req_id.strip()
+                            #print(req_id)
+                            #for match_group in req_id:
+                                #traceability_list.append([declFunc.spelling, match_group[0], repr(declFunc.location.line),
+                            traceability_list.append([req_id, declFunc.spelling, repr(declFunc.location.line),
+                                repr(declFunc.location.column), repr(declFunc.location.file), repr(token.location.line),
+                                repr(token.location.column), repr(token.location.file)])
     else:
         print("you have to specify the name of the file...")
 
     if len(traceability_list) > 0:
         generateOutput(traceability_list, argparser)
+        out_file = open(src_file+".trace.txt", "w")
+        out_file.write(getListAsString(traceability_list, argparser))
 
 
 def main():
