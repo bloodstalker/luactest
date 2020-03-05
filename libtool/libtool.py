@@ -25,7 +25,10 @@ else:
 
 import clang.cindex
 import llvm
-clang.cindex.Config.set_library_file("/cygdrive/c/Program Files/LLVM8/bin/libclang.dll")
+if os.uname().sysname.find("CYGWIN") != -1:
+    clang.cindex.Config.set_library_file("/cygdrive/c/Program Files/LLVM8/bin/libclang.dll")
+else:
+    clang.cindex.Config.set_library_file("/home/bloodstalker/extra/llvm-clang-4/build/lib/libclang.so")
 from clang import enumerations as clangenums
 
 
@@ -91,6 +94,10 @@ def getListAsString(traceability_list, argparser):
 def getcompbase(source_file_path, compbase_path):
     compdb = clang.cindex.CompilationDatabase.fromDirectory(compbase_path)
     compcomms = compdb.getCompileCommands(source_file_path)
+    for comm in compcomms:
+        print(comm.arguments)
+        print(comm.directory)
+        print(comm.filename)
     return compcomms
 
 
@@ -99,7 +106,7 @@ def premain(argparser):
     signal.signal(signal.SIGINT, SigHandler_SIGINT)
     #here
     traceability_list = []
-    traceability_list.append(["Requirement ID", "Function name", "Function line", "Function column", 
+    traceability_list.append(["Requirement ID", "Function name", "Function line", "Function column",
         "Function file", "comment line", "comment column", "comment file"])
     if argparser.args.file is not None:
         for src_file in argparser.args.file:

@@ -317,7 +317,7 @@ public:
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef file) override {
 #if __clang_major__ > 9
     CI.getPreprocessor().addPPCallbacks(std::make_unique<PPInclusion>(&CI.getSourceManager(), &TheRewriter));
-#elif
+#else
     CI.getPreprocessor().addPPCallbacks(llvm::make_unique<PPInclusion>(&CI.getSourceManager(), &TheRewriter));
 #endif
     DiagnosticsEngine &DE = CI.getPreprocessor().getDiagnostics();
@@ -325,7 +325,7 @@ public:
     TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
 #if __clang_major__ > 9
     return std::make_unique<LCTASTConsumer>(TheRewriter);
-#elif
+#else
     return llvm::make_unique<LCTASTConsumer>(TheRewriter);
 #endif
   }
